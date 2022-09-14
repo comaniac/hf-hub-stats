@@ -1,0 +1,34 @@
+name: Update Download Trend
+
+on:
+  schedule:
+    # Note that cron uses UTC times and weeks start from Sunday (0).
+    # Run every Sunday at 4pm (PST).
+    - cron:  '0 0 * * 1'
+
+  workflow_dispatch:
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v3
+    - name: Set up Python 3.7
+      uses: actions/setup-python@v3
+      with:
+        python-version: "3.7"
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install argparse accelerate transformers huggingface_hub
+    - name: Update
+      run: |
+        # Clone existing DB
+        wget https://gist.githubusercontent.com/comaniac/b7f8dfba8cf9b268e544efa01c4ff3c1/raw/e28dd8bc1286f23ece343f8901bd37b2edd0cf53/hf_hub_download_trend_db.json
+        python -m hf_hub_stats update_download_trend_db --db hf_hub_download_trend_db.json --end 5000
+    - name: Deploy
+      uses: exuanbo/actions-deploy-gist@v1
+      with:
+        token: ${{ secrets.TOKEN }}
+        gist_id: b7f8dfba8cf9b268e544efa01c4ff3c1
+        file_path: hf_hub_download_trend_db.json
