@@ -6,21 +6,21 @@ Speficailly, we now provide the following features:
 ### Construct a Database for Model Size
 
 For example, the following command calculates the model size (i.e., parameter number)
-of the top-5000 most download models in the past 30 days, and dump to a database in JSON format.
+of the top-1000 most download models in the past 30 days, and dump to a database in JSON format.
 
 ```python
-python -m hf_hub_stats update_size_db --db size_db.json --end 5000
+python -m hf_hub_stats update_size_db --db size_db.json --end 1000
 ```
 
 ### Constract a Database for Download Trend
 
-The following command extracts the total download count in the past 30 days of top-5000 models,
+The following command extracts the total download count in the past 30 days of top-1000 models,
 and dump to a database in JSON format. Since the new record is appended to the database,
 suppose we run this command in weekly basis, we can then calculate the weekly download number
 and conduct a download trend of each model.
 
 ```python
-python -m hf_hub_stats update_download_trend_db --db hf_hub_download_trend_db.json --end 5000 
+python -m hf_hub_stats update_download_trend_db --db hf_hub_download_trend_db.json --end 1000 
 ```
 
 ### List Top-N Most Download Models
