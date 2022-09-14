@@ -23,31 +23,37 @@ def get_top_models(all_models, args, print_markdown=False):
     # Load model size database if available.
     size_db = SizeDB(args.db)
 
-    # Take top models while ignoring small ones.
+    # Whether to skip size checking.
+    skip_size = args.min_size == 0 and args.max_size == float("inf")
+
+    # Take top models in the given size range.
     models = []
     list_extra = 0
     start, end = args.start, min(args.end, len(all_models))
     for model in all_models[start : end]:
         model_id = model.modelId
-        if model_id in size_db:
-            result = size_db[model_id]
+        if skip_size:
+            model.size = 0
         else:
-            result = get_model_size_in_b_with_empty_weights(model_id, fallback=True)
+            if model_id in size_db:
+                result = size_db[model_id]
+            else:
+                result = get_model_size_in_b_with_empty_weights(model_id, fallback=True)
 
-        if result.code != 0:
-            # Still include unsupported models.
-            list_extra += 1
-        elif result.size < args.min_size:
-            # Ignore small models.
-            continue
-        elif result.size > args.max_size:
-            # Ignore large models.
-            continue
+            if result.code != 0:
+                # Still include unsupported models.
+                list_extra += 1
+            elif result.size < args.min_size:
+                # Ignore small models.
+                continue
+            elif result.size > args.max_size:
+                # Ignore large models.
+                continue
 
-        model.size = result.size
+            model.size = result.size
         models.append(model)
         print(
-            f"Appended {model_id}: {result.size}B params, now {len(models)} models,",
+            f"Appended {model_id}: {model.size}B params, now {len(models)} models,",
             f"target {args.limit + list_extra} models",
             flush=True,
         )

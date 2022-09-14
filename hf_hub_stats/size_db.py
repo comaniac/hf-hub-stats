@@ -33,7 +33,7 @@ class SizeDB:
         self.dirty = False
         self.file_name = file_name
         self.db = {}
-        if os.path.exists(file_name):
+        if file_name is not None and os.path.exists(file_name):
             with open(file_name, "r") as filep:
                 for key, val in json.load(filep).items():
                     self.db[key] = CalcModelSizeResult(**val)
@@ -62,6 +62,10 @@ class SizeDB:
             self.dirty = True
 
     def persist(self):
+        if self.file_name is None:
+            print("Skip dumping DB because no file path is provided", flush=True)
+            return
+
         if self.dirty:
             print(f"Updating database with total {len(self.db)} records", flush=True)
             with open(self.file_name, "w") as filep:
