@@ -3,7 +3,6 @@ import datetime
 import os
 
 import json
-from tqdm import tqdm
 from dataclasses import asdict, dataclass
 
 
@@ -51,7 +50,7 @@ class DownloadTrendDB:
 
     def update(self, all_models, args):
         today = str(datetime.datetime.today())
-        for model in tqdm(all_models[args.start: min(args.end, len(all_models))]):
+        for model in all_models[args.start: min(args.end, len(all_models))]:
             model_id = model.modelId
             if not hasattr(model, "downloads"):
                 continue
