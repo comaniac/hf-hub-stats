@@ -25,7 +25,7 @@ jobs:
       run: |
         # Clone existing DB
         wget https://gist.githubusercontent.com/comaniac/b7f8dfba8cf9b268e544efa01c4ff3c1/raw \
-            -O hf_hub_download_trend_db.jsonhf_hub_download_trend_db.json
+            -O hf_hub_download_trend_db.json
         python -m hf_hub_stats update_download_trend_db --db hf_hub_download_trend_db.json --end 1000
     - name: Deploy
       uses: exuanbo/actions-deploy-gist@v1
