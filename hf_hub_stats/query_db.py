@@ -1,17 +1,20 @@
-import datetime
-
+"""Query database for useful insights."""
 from .download_db import DownloadTrendDB
 from .size_db import SizeDB, get_model_size_in_b_with_empty_weights
 from .utils import draw_slope_chart, print_model_in_md
 
 
-def get_top_models(args, print_markdown=False):
+def query_top_models(args, print_markdown=False):
     # Load database.
     size_db = SizeDB(args.size_db)
     download_db = DownloadTrendDB(args.download_db)
 
     # Take the latest download counts and sort.
-    all_models = sorted(download_db.latest(), key=lambda x: x.download, reverse=True)
+    all_models = sorted(
+        download_db.latest() if args.date is None else download_db[args.date],
+        key=lambda x: x.download,
+        reverse=True,
+    )
 
     # Whether to skip size checking.
     skip_size = args.min_size == 0 and args.max_size == float("inf")
@@ -31,8 +34,11 @@ def get_top_models(args, print_markdown=False):
                 result = get_model_size_in_b_with_empty_weights(model_id, fallback=True)
 
             if result.code != 0:
-                # Still include unsupported models.
-                list_extra += 1
+                if args.include_unsupported:
+                    # Still include unsupported models.
+                    list_extra += 1
+                else:
+                    continue
             elif result.size < args.min_size:
                 # Ignore small models.
                 continue
@@ -57,19 +63,27 @@ def get_top_models(args, print_markdown=False):
     return models
 
 
+def query_model_size(model_ids, size_db, print_result=False):
+    # Load database.
+
+    results = []
+    for model_id in model_ids:
+        if model_id in size_db:
+            results.append(size_db[model_id])
+        else:
+            results.append(get_model_size_in_b_with_empty_weights(model_id, fallback=True))
+
+        if print_result:
+            print(results[-1])
+    return results
+
+
 def draw_download_trend(args):
     import pandas as pd
 
     def size_in_range(size_db, model_id, min_size, max_size):
-        if model_id in size_db:
-            result = size_db[model_id]
-        else:
-            result = get_model_size_in_b_with_empty_weights(model_id, fallback=True)
-
-        if result.code != 0 or result.size < min_size or result.size > max_size:
-            # Ignore unsupported, out of range models.
-            return False
-        return True
+        result = query_model_size([model_id], size_db)[0]
+        return result.code == 0 and result.size >= min_size and result.size <= max_size
 
     # Load database.
     size_db = SizeDB(args.size_db)
@@ -107,9 +121,7 @@ def draw_download_trend(args):
         rank = 1
         for model_n_download in sorted_model_n_download:
             model_id = model_n_download.model_id
-            if not (
-                skip_size or size_in_range(size_db, model_id, args.min_size, args.max_size)
-            ):
+            if not (skip_size or size_in_range(size_db, model_id, args.min_size, args.max_size)):
                 continue
             model_to_rank[model_id] = rank
             rank += 1
@@ -120,10 +132,8 @@ def draw_download_trend(args):
             else:
                 data[date].append(float("inf"))
 
-    df = pd.DataFrame.from_dict(data, orient="index", columns=target_models)
-
     draw_slope_chart(
-        df,
+        pd.DataFrame.from_dict(data, orient="index", columns=target_models),
         file_name=args.output,
         ylim=args.limit,
         line_args={"linewidth": 2, "alpha": 0.5},

@@ -2,7 +2,7 @@
 import argparse
 
 from .query_hub import query_hf_hub
-from .query_db import get_top_models, draw_download_trend
+from .query_db import query_top_models, query_model_size, draw_download_trend
 from .size_db import SizeDB
 from .download_db import DownloadTrendDB
 
@@ -16,6 +16,7 @@ def parse_args():
     parser = argparse.ArgumentParser()
     subprasers = parser.add_subparsers(dest="mode", help="Execution modes")
 
+    # CLI for querying top downloaded models.
     query_top_parser = subprasers.add_parser(
         "query_top", parents=[common_parser], help="Query top download models from download DB"
     )
@@ -26,6 +27,10 @@ def parse_args():
         "--size-db", type=str, help="The path to model size database in JSON"
     )
     query_top_parser.add_argument(
+        "--date", type=str, help="The date in %m-%d-%y format to query the top models."
+        "The latest date in the download DB will be used if unspecified."
+    )
+    query_top_parser.add_argument(
         "--limit", type=int, default=20, help="The maximum number of returned models"
     )
     query_top_parser.add_argument(
@@ -34,7 +39,11 @@ def parse_args():
     query_top_parser.add_argument(
         "--max-size", type=float, default=float("inf"), help="The maximum model size in billions"
     )
+    query_top_parser.add_argument(
+        "--include-unsupported", action="store_true", help="Include unsupported models"
+    )
 
+    # CLI for updating the size database.
     size_db_parser = subprasers.add_parser(
         "update_size_db", parents=[common_parser], help="Update size database"
     )
@@ -42,6 +51,18 @@ def parse_args():
         "--size-db", type=str, required=True, help="The path to model size database in JSON"
     )
 
+    # CLI for querying the model size.
+    query_size_parser = subprasers.add_parser(
+        "query_size", parents=[common_parser], help="Query model size"
+    )
+    query_size_parser.add_argument(
+        "--size-db", type=str, required=True, help="The path to model size database in JSON"
+    )
+    query_size_parser.add_argument(
+        "--model-ids", nargs="+", required=True, help="The model ID to query"
+    )
+
+    # CLI for updating the download trend database.
     download_db_parser = subprasers.add_parser(
         "update_download_trend_db", parents=[common_parser], help="Update download trend database"
     )
@@ -49,6 +70,7 @@ def parse_args():
         "--download-db", type=str, required=True, help="The path to database in JSON"
     )
 
+    # CLI for drawing download trend.
     draw_download_trend_parser = subprasers.add_parser(
         "draw_download_trend", parents=[common_parser], help="Draw download trends"
     )
@@ -67,9 +89,7 @@ def parse_args():
     draw_download_trend_parser.add_argument(
         "--max-size", type=float, default=float("inf"), help="The maximum model size in billions"
     )
-    draw_download_trend_parser.add_argument(
-        "-o", "--output", type=str, default="trend.pdf", help="The output file name"
-    )
+    draw_download_trend_parser.add_argument("-o", "--output", type=str, help="The output file name")
     return parser.parse_args()
 
 
@@ -83,7 +103,9 @@ def main():
     elif args.mode == "draw_download_trend":
         draw_download_trend(args)
     elif args.mode == "query_top":
-        get_top_models(args, print_markdown=True)
+        query_top_models(args, print_markdown=True)
+    elif args.mode == "query_size":
+        query_model_size(args.model_ids, SizeDB(args.size_db), print_result=True)
 
 
 if __name__ == "__main__":

@@ -96,4 +96,7 @@ def draw_slope_chart(
     left_yaxis.xaxis.grid(color="lightgray", linestyle="solid")
     plt.gcf().autofmt_xdate()
     plt.tight_layout()
-    plt.savefig(file_name, bbox_inches="tight")
+    if file_name is None:
+        plt.show()
+    else:
+        plt.savefig(file_name, bbox_inches="tight")

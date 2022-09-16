@@ -1,9 +1,8 @@
 """Model Size Database."""
-import concurrent.futures
 import os
+import tempfile
 
 import json
-import shutil
 from dataclasses import asdict, dataclass
 
 import transformers
@@ -73,49 +72,40 @@ class SizeDB:
                 json.dump(data, filep, indent=2)
         self.dirty = False
 
+    def remove_errors(self):
+        new_db = {}
+        removed = 0
+        for model_id, result in self.db.items():
+            if result.code == 0:
+                new_db[model_id] = result
+            else:
+                print(f"Remove {model_id} with result: {result}", flush=True)
+                removed += 1
+
+        print(f"Removed {removed} models with errors", flush=True)
+        self.db = new_db
+
     def update(self, all_models, args):
-        BATCH_SIZE = 32
+        PERSIST_EVERY = 32
 
-        with concurrent.futures.ThreadPoolExecutor() as executor:
-            n_models = len(all_models)
-            model_idx = args.start
-            while model_idx < n_models:
-                futures = []
-                while model_idx < n_models and len(futures) < BATCH_SIZE:
-                    model = all_models[model_idx]
-                    model_id = model.modelId
-                    if model_id not in self:
-                        futures.append(
-                            executor.submit(
-                                get_model_size_in_b_with_empty_weights,
-                                model_id=model.modelId,
-                                fallback=False,
-                            )
-                        )
-                    model_idx += 1
-                    if model_idx == args.end:
-                        break
+        changed = 0
+        for model in all_models[args.start : min(args.end, len(all_models))]:
+            model_id = model.modelId
 
-                print(
-                    f"Collecting results of {len(futures)} tasks. Current model idx {model_idx}",
-                    flush=True,
-                )
-                ids = []
-                for future in concurrent.futures.as_completed(futures):
-                    result = future.result()
-                    ids.append(result.model_id)
-                    if result.code == 2:
-                        # Failed to estimate with empty weights. Try again with model on CPU.
-                        # Note that here we run them sequentially to avoid OOM.
-                        result = get_model_size_in_b_with_empty_weights(
-                            result.model_id, fallback=True
-                        )
+            # Cache hit.
+            if model_id in self:
+                continue
 
-                    self[result.model_id] = result
+            # Cacht miss. Estimate the model size with empty weights.
+            result = get_model_size_in_b_with_empty_weights(model_id, fallback=True)
+            self[model_id] = result
+            changed += 1
 
+            if changed == PERSIST_EVERY:
                 self.persist()
-                if model_idx >= args.end:
-                    break
+
+        if changed > 0:
+            self.persist()
 
     def draw_markdown(self, max_memo_len=float("inf")):
         import pandas
@@ -143,40 +133,42 @@ class SizeDB:
         print(df.to_markdown(index=False))
 
 
-def get_param_in_b(model_id, fallback):
-    cfg = transformers.AutoConfig.from_pretrained(model_id, trust_remote_code=True, revision="main")
-    try:
-        model = transformers.AutoModel.from_config(cfg)
-    except Exception as err:
-        if MISS_CONFIG_MSG in str(err):
-            raise Exception(model_id)
-
-        # This may due to the fact that the model implementation is not in the
-        # official transformers but the model repo. In this case, we directly
-        # load the pretrained model to calculate the parameter number.
-        # This could be slow and need many disk spaces.
-        if fallback:
-            print(f"Calculating the size of {model_id} with pretrained model on CPU", flush=True)
-            model = transformers.AutoModel.from_pretrained(
-                cfg, trust_remote_code=True, cache_dir="./temp"
-            )
-            shutil.rmtree("./temp", ignore_errors=True, onerror=None)
-        else:
-            # When we are not allowed to load pretrained model (may be in a parallel executor),
-            # we simply raise an exception.
-            raise RuntimeError(model_id)
-    return model.num_parameters() / 1e9
-
-
 def get_model_size_in_b_with_empty_weights(model_id, fallback=True):
-    try:
-        with init_empty_weights():
-            size_in_b = get_param_in_b(model_id, fallback=fallback)
-    except RuntimeError:
-        # Failed to estimate without weights and not allowed to fallback.
-        return CalcModelSizeResult(model_id, 0, 2)
-    except Exception as err:
-        # Failed to estimate anyways.
-        return CalcModelSizeResult(model_id, 0, 1, str(err))
+    def _get_size_with_empty_weights(model_id):
+        cfg = transformers.AutoConfig.from_pretrained(
+            model_id, trust_remote_code=True, revision="main"
+        )
+        try:
+            with init_empty_weights():
+                model = transformers.AutoModel.from_config(cfg)
+            return CalcModelSizeResult(model_id, model.num_parameters() / 1e9, 0)
+        except Exception as err:
+            if MISS_CONFIG_MSG in str(err):
+                return CalcModelSizeResult(model_id, 0, 1, str(err))
 
-    return CalcModelSizeResult(model_id, size_in_b, 0)
+        # Failed to estimate without weights. This may due to the fact that
+        # the model implementation is not in the official transformers but the model repo.
+        return CalcModelSizeResult(model_id, 0, 2)
+
+    def _get_size(model_id):
+        try:
+            with tempfile.TemporaryDirectory(prefix="hf_hub_stats_model_") as tmpdir:
+                model = transformers.AutoModel.from_pretrained(
+                    model_id, trust_remote_code=True, cache_dir=tmpdir
+                )
+                return CalcModelSizeResult(model_id, model.num_parameters() / 1e9, 0)
+        except Exception as err:
+            # Failed to estimate anyways.
+            return CalcModelSizeResult(model_id, 0, 1, str(err))
+
+    result = _get_size_with_empty_weights(model_id)
+    if fallback and result.code == 2:
+        # Failed to estimate with empty weights. Try again with model on CPU.
+        # Note that here we run them sequentially to avoid OOM.
+        print(
+            f"Getting the size of {model_id} with a pretrained model",
+            flush=True,
+        )
+        result = _get_size(model_id)
+        print(f"Result: {result}", flush=True)
+    return result
