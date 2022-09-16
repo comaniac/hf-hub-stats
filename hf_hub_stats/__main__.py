@@ -2,7 +2,7 @@
 import argparse
 
 from .query_hub import query_hf_hub
-from .query_db import query_top_models, query_model_size, draw_download_trend
+from .query_db import query_top_models, query_model_size, draw_download_trend, query_model_download
 from .size_db import SizeDB
 from .download_db import DownloadTrendDB
 
@@ -27,8 +27,10 @@ def parse_args():
         "--size-db", type=str, help="The path to model size database in JSON"
     )
     query_top_parser.add_argument(
-        "--date", type=str, help="The date in %m-%d-%y format to query the top models."
-        "The latest date in the download DB will be used if unspecified."
+        "--date",
+        type=str,
+        help="The date in %m-%d-%y format to query the top models."
+        "The latest date in the download DB will be used if unspecified.",
     )
     query_top_parser.add_argument(
         "--limit", type=int, default=20, help="The maximum number of returned models"
@@ -70,6 +72,23 @@ def parse_args():
         "--download-db", type=str, required=True, help="The path to database in JSON"
     )
 
+    # CLI for querying the model download.
+    query_download_parser = subprasers.add_parser(
+        "query_download", parents=[common_parser], help="Query model download times"
+    )
+    query_download_parser.add_argument(
+        "--download-db", type=str, required=True, help="The path to download time database in JSON"
+    )
+    query_download_parser.add_argument(
+        "--model-ids", nargs="+", required=True, help="The model ID to query"
+    )
+    query_download_parser.add_argument(
+        "--date",
+        type=str,
+        help="The date in %m-%d-%y format to query."
+        "The latest date in the download DB will be used if unspecified.",
+    )
+
     # CLI for drawing download trend.
     draw_download_trend_parser = subprasers.add_parser(
         "draw_download_trend", parents=[common_parser], help="Draw download trends"
@@ -81,7 +100,7 @@ def parse_args():
         "--size-db", type=str, help="The path to model size database in JSON"
     )
     draw_download_trend_parser.add_argument(
-        "--download-db", type=str, required=True, help="The path to model size database in JSON"
+        "--download-db", type=str, required=True, help="The path to download time database in JSON"
     )
     draw_download_trend_parser.add_argument(
         "--min-size", type=float, default=0, help="The minimum model size in billions"
@@ -104,6 +123,10 @@ def main():
         draw_download_trend(args)
     elif args.mode == "query_top":
         query_top_models(args, print_markdown=True)
+    elif args.mode == "query_download":
+        query_model_download(
+            args.model_ids, args.date, DownloadTrendDB(args.download_db), print_result=True
+        )
     elif args.mode == "query_size":
         query_model_size(args.model_ids, SizeDB(args.size_db), print_result=True)
 

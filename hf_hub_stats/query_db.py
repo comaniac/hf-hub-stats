@@ -64,8 +64,6 @@ def query_top_models(args, print_markdown=False):
 
 
 def query_model_size(model_ids, size_db, print_result=False):
-    # Load database.
-
     results = []
     for model_id in model_ids:
         if model_id in size_db:
@@ -75,6 +73,20 @@ def query_model_size(model_ids, size_db, print_result=False):
 
         if print_result:
             print(results[-1])
+    return results
+
+
+def query_model_download(model_ids, date, download_db, print_result=False):
+    model_id_set = set(model_ids)
+    data = download_db.latest() if date is None else download_db[date]
+
+    results = []
+    for model_n_download in data:
+        model_id = model_n_download.model_id
+        if model_id in model_id_set:
+            results.append(model_n_download)
+            if print_result:
+                print(model_n_download)
     return results
 
 
