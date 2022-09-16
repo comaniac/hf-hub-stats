@@ -12,6 +12,13 @@ of the top-1000 most download models in the past 30 days, and dump to a database
 python -m hf_hub_stats update_size_db --size-db size_db.json --end 1000
 ```
 
+After the consutrction, you can also query the model size as follows:
+
+```python
+python -m hf_hub_stats query_size --size-db hf_hub_model_size_db.json --model-ids \
+EleutherAI/gpt-j-6B bert-base-uncased
+```
+
 ### Constract a Database for Download Trend
 
 The following command extracts the total download count in the past 30 days of top-1000 models,
@@ -37,7 +44,6 @@ You can also add model size constraints. In this example, we only draw the trend
 python -m hf_hub_stats draw_download_trend --download-db hf_hub_download_trend_db.json --limit 20 -o trend.pdf \
 --min-size 1 --max-size 10 --size-db hf_hub_model_size_db.json
 ```
-
 
 ### List Top-N Most Download Models
 
