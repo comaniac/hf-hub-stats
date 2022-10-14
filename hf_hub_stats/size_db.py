@@ -135,9 +135,14 @@ class SizeDB:
 
 def get_model_size_in_b_with_empty_weights(model_id, fallback=True):
     def _get_size_with_empty_weights(model_id):
-        cfg = transformers.AutoConfig.from_pretrained(
-            model_id, trust_remote_code=True, revision="main"
-        )
+        try:
+            cfg = transformers.AutoConfig.from_pretrained(
+                model_id, trust_remote_code=True, revision="main"
+            )
+        except Exception as err:
+            # Fail to get the model config.
+            return CalcModelSizeResult(model_id, 0, 1, str(err))
+
         try:
             with init_empty_weights():
                 model = transformers.AutoModel.from_config(cfg)

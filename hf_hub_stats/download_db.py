@@ -59,3 +59,13 @@ class DownloadTrendDB:
             self.db[today].append(ModelNDownload(model.modelId, model.downloads))
 
         self.persist()
+
+    def prune(self, max_records=10):
+        dates = sorted([datetime.datetime.strptime(d, "%m-%d-%y") for d in self.db.keys()])
+        if max_records >= len(dates):
+            print(f"Skip pruning because {max_records} >= {len(dates)}", flush=True)
+            return
+        tbd = len(dates) - max_records
+        for date in dates[:tbd]:
+            del self.db[date.strftime("%m-%d-%y")]
+        self.persist()

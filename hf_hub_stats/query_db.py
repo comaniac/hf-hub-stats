@@ -123,7 +123,10 @@ def draw_download_trend(args):
 
     # Take top models in the given size range.
     data = {}
-    for date in dates:
+    start_date = 0
+    if args.max_history > 0 and args.max_history < len(dates):
+        start_date = len(dates) - args.max_history
+    for date in dates[start_date:]:
         data[date] = []
 
         # Find the rank of the target models.

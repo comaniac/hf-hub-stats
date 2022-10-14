@@ -6,6 +6,7 @@ import pickle
 
 from huggingface_hub import HfApi, ModelFilter
 
+
 def query_hf_hub(cache_expire=7):
     """Query Huggingface Hub with filter."""
     cache_folder = os.path.join(os.path.expanduser("~"), ".cache/query_hf_hub/")

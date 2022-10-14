@@ -108,6 +108,12 @@ def parse_args():
     draw_download_trend_parser.add_argument(
         "--max-size", type=float, default=float("inf"), help="The maximum model size in billions"
     )
+    draw_download_trend_parser.add_argument(
+        "--max-history",
+        type=int,
+        default=0,
+        help="The maximum number of records to draw." "Default 0 draws all records.",
+    )
     draw_download_trend_parser.add_argument("-o", "--output", type=str, help="The output file name")
     return parser.parse_args()
 
