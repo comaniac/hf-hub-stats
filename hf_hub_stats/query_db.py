@@ -1,7 +1,7 @@
 """Query database for useful insights."""
 from .download_db import DownloadTrendDB
 from .size_db import SizeDB, get_model_size_in_b_with_empty_weights
-from .utils import draw_slope_chart, print_model_in_md
+from .utils import draw_rank_chart, draw_trend_chart, print_model_in_md
 
 
 def query_top_models(args, print_markdown=False):
@@ -147,10 +147,59 @@ def draw_download_trend(args):
             else:
                 data[date].append(float("inf"))
 
-    draw_slope_chart(
+    draw_rank_chart(
         pd.DataFrame.from_dict(data, orient="index", columns=target_models),
         file_name=args.output,
         ylim=args.limit,
+        line_args={"linewidth": 2, "alpha": 0.5},
+        scatter_args={"s": 70, "alpha": 0.8},
+    )
+
+
+def draw_size_trend(args):
+    import pandas as pd
+
+    # Load database.
+    size_db = SizeDB(args.size_db)
+    download_db = DownloadTrendDB(args.download_db)
+
+    dates = download_db.dates(sort=True)
+    start_date = 0
+    if args.max_history > 0 and args.max_history < len(dates):
+        start_date = len(dates) - args.max_history
+
+    data = {}
+    for date in dates[start_date:]:
+        # Get top models in the this date.
+        all_models = sorted(download_db[date], key=lambda x: x.download, reverse=True)
+        sizes = []
+        for model in all_models:
+            model_size = query_model_size([model.model_id], size_db)[0]
+            if (
+                model_size.code != 0
+                or model_size.size < args.min_size
+                or model_size.size > args.max_size
+            ):
+                continue
+
+            sizes.append(model_size.size)
+            if len(sizes) == args.limit:
+                break
+
+        # Calculate the model size statistics.
+        data[date] = (max(sizes), sum(sizes) / len(sizes), min(sizes))
+
+    # Determine the display unit (B or M).
+    unit = "B"
+    if all([stat[1] <= 1 for stat in data.values()]):
+        unit = "M"
+        for date in data:
+            data[date] = (val * 1e3 for val in data[date])
+
+    draw_trend_chart(
+        pd.DataFrame.from_dict(data, orient="index", columns=["max-size", "avg-size", "min-size"]),
+        file_name=args.output,
+        ylabel=f"Model Size ({unit})",
         line_args={"linewidth": 2, "alpha": 0.5},
         scatter_args={"s": 70, "alpha": 0.8},
     )

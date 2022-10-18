@@ -19,9 +19,9 @@ def print_model_in_md(models):
     print(tabulate(data, headers=["Rank", "Name", "Downloads", "Size"]))
 
 
-def draw_slope_chart(
+def draw_rank_chart(
     df,
-    file_name="slope_chart.pdf",
+    file_name="rank_chart.pdf",
     show_rank_axis=True,
     rank_axis_distance=1.5,
     ax=None,
@@ -94,6 +94,46 @@ def draw_slope_chart(
         far_right_yaxis.spines["right"].set_position(("axes", rank_axis_distance))
 
     left_yaxis.xaxis.grid(color="lightgray", linestyle="solid")
+    plt.gcf().autofmt_xdate()
+    plt.tight_layout()
+    if file_name is None:
+        plt.show()
+    else:
+        plt.savefig(file_name, bbox_inches="tight")
+
+
+def draw_trend_chart(
+    df,
+    file_name="trend_chart.pdf",
+    scatter=True,
+    ylim=float("inf"),
+    ylabel="",
+    line_args={},
+    scatter_args={},
+):
+    import matplotlib.pyplot as plt
+
+    plt.figure(figsize=(15, 5))
+
+    yaxis = plt.gca()
+
+    # Plot trends
+    for col in df.columns:
+        y = df[col].mask(df[col] > ylim, None)
+        x = df.index.values
+        yaxis.plot(x, y, **line_args, solid_capstyle="round", label=col)
+
+        # Adding scatter plots
+        if scatter:
+            yaxis.scatter(x, y, **scatter_args)
+
+        # Add data labels
+        for x_val, y_val in zip(x, y):
+            yaxis.annotate("{:.2f}".format(y_val), xy=(x_val, y_val), textcoords="data")
+
+    yaxis.legend()
+    yaxis.xaxis.grid(color="lightgray", linestyle="solid")
+    plt.ylabel(ylabel)
     plt.gcf().autofmt_xdate()
     plt.tight_layout()
     if file_name is None:
